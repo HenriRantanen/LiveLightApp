@@ -19,10 +19,9 @@ import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
-import android.widget.ImageButton;
 import android.widget.ListView;
 import android.widget.ProgressBar;
-import android.widget.TabHost;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.TimePicker;
 import android.widget.Toast;
@@ -35,12 +34,9 @@ import com.google.android.gms.wearable.Wearable;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
-
-import org.apache.commons.io.IOUtils;
 
 public class MainActivity extends Activity implements GoogleApiClient.ConnectionCallbacks {
 
@@ -49,6 +45,12 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
     int hour_x;
     int minute_x;
     static final String NO_CONNECTION_TEXT = "No internet connection";
+
+    // User info
+    String userName = "user";
+    String userFirstName = "";
+    String UserAtHome = "0";
+    String alarmSet = "";
 
     @Override
     protected Dialog onCreateDialog(int id) {
@@ -62,12 +64,11 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
             new TimePickerDialog.OnTimeSetListener() {
 
                 @Override
-            public void onTimeSet(TimePicker view, int hourOfDay, int minute){
+                public void onTimeSet(TimePicker view, int hourOfDay, int minute){
                     hour_x = hourOfDay;
                     minute_x = minute;
 
                     setAlarm(hour_x, minute_x);
-                    //Toast.makeText(MainActivity.this, hour_x + ":" + minute_x, Toast.LENGTH_LONG).show();
                 }
 
             };
@@ -97,6 +98,20 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
         //mApiClient.disconnect();
         //LocalBroadcastManager.getInstance(this).unregisterReceiver(broadcastReceiver);
         Log.v("wear", "MainActivity destroyed");
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+
+        // Get data from server
+        String link = getServerAddress() + "api.php?key="+ settings.apikey +"&status";
+        try {
+            // Contact server
+            new MyTask().execute(new URL(link)).toString();
+        } catch (MalformedURLException e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
@@ -221,27 +236,26 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
             }
         });
 
-        // At home- button listener
-        final Button homeButton = (Button) findViewById(R.id.buttonHome);
-        homeButton.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                atHome(true);
-            }
-        });
-
-        // Away button listener
-        final Button awayButton = (Button) findViewById(R.id.buttonAway);
-        awayButton.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                atHome(false);
-            }
-        });
-
         // wakeup button listener
         final Button buttonSetWakeup = (Button) findViewById(R.id.buttonSetWakeup);
         buttonSetWakeup.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 showDialog(DIALOG_ID);
+                updateUIStatus();
+            }
+        });
+
+        // home switch listener
+        final Switch switchAtHome = (Switch) findViewById(R.id.switchAtHome);
+        switchAtHome.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                if (switchAtHome.isChecked()) {
+                    UserAtHome = "1";
+                    atHome(true);
+                } else {
+                    UserAtHome = "0";
+                    atHome(false);
+                }
             }
         });
 
@@ -290,11 +304,13 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
     {
         URL osoite;
         String link = getServerAddress();
+        final Button buttonSetWakeup = (Button) findViewById(R.id.buttonSetWakeup);
 
         if (home) {
             link = link + "api.php?userStatus=home" + "&key=" + settings.apikey;
         } else {
             link = link + "api.php?userStatus=away" + "&key=" + settings.apikey;
+            buttonSetWakeup.setText("Set Wakeup");
         }
 
         try {
@@ -304,6 +320,7 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
             e.printStackTrace();
         }
 
+        onResume();
     }
 
     public void setAlarm (Integer hour, Integer minute){
@@ -325,6 +342,9 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
         } catch (MalformedURLException e) {
             e.printStackTrace();
         }
+
+        alarmSet = hour.toString() + ":" + minute.toString();
+        updateUIStatus();
     }
 
     protected String getServerAddress () {
@@ -347,6 +367,31 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
             connectionView.setText("Connection: Internet");
             return "http://" + settings.wanIP + "/";
         }
+    }
+
+    public void updateUIStatus (){
+        // Update home switch
+        final Switch switchAtHome = (Switch) findViewById(R.id.switchAtHome);
+        if(UserAtHome.equals("1")){
+            switchAtHome.setChecked(true);
+        }
+        else {
+            switchAtHome.setChecked(false);
+        }
+
+        // Update alarm-button
+        final Button buttonSetWakeup = (Button) findViewById(R.id.buttonSetWakeup);
+        if(alarmSet.equals("")){
+            buttonSetWakeup.setText("Set Wakeup");
+        }
+        else{
+            buttonSetWakeup.setText("Wakeup: "+ alarmSet);
+        }
+
+        // Users name
+        TextView TextViewUserName = (TextView) findViewById(R.id.TextViewUserName);
+        TextViewUserName.setText("Hey "+userFirstName+"!");
+
     }
 
     class MyTask extends AsyncTask <URL, Void, String>{
@@ -394,8 +439,6 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
         @Override
         protected void onPostExecute(String prosessi) {
 
-
-
             // Hide the loader on app
             loader.setIndeterminate(false);
 
@@ -403,6 +446,7 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
             sendMessage(WEAR_MESSAGE_PATH, "hideLoader");
 
             // If there is no connection
+            // if settings message is received
             if(prosessi == "error") {
                 // Show error on UI
                 TextView connectionView = (TextView) findViewById(R.id.viewConnection);
@@ -412,18 +456,57 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
                 // Let the wear know there was an error
                 sendMessage(WEAR_MESSAGE_PATH, "con:no");
             }
-            else{
+            else if (prosessi.endsWith("</settings>")) {
+
+                String xml = prosessi;
+
+                //User's name
+                String tag = "userName";
+                int start = xml.indexOf("<" + tag + ">") + tag.length() + 2;
+                int stop = xml.indexOf("</" + tag + ">");
+                userName = xml.substring(start, stop);
+
+                //User's first name
+                userFirstName = userName.substring(0, userName.indexOf(" "));
+
+                //User's status
+                tag = "UserAtHome";
+                start = xml.indexOf("<" + tag + ">") + tag.length() + 2;
+                stop = xml.indexOf("</" + tag + ">");
+                UserAtHome = xml.substring(start, stop);
+
+                //Alarm set time
+                tag = "alarmSet";
+                start = xml.indexOf("<" + tag + ">") + tag.length() + 2;
+                stop = xml.indexOf("</" + tag + ">");
+                alarmSet = xml.substring(start, stop);
+                // Time picker values
+
+                if(alarmSet.length()>4)
+                {
+                    hour_x = Integer.parseInt(alarmSet.substring(0, 2));
+                    minute_x = Integer.parseInt(alarmSet.substring(3, 5));
+                }
+                else
+                {
+                    hour_x = 9;
+                    minute_x = 0;
+                }
+
+
+
+                updateUIStatus();
+            } else {
+
                 // Show the feedback from server
                 Toast.makeText(MainActivity.this, prosessi, Toast.LENGTH_LONG).show();
                 // Send the connection info to wear
                 if (connection.contains(settings.lanIP)) {
                     sendMessage(WEAR_MESSAGE_PATH, "con:wifi");
-                } else if (connection.contains(settings.wanIP)){
+                } else if (connection.contains(settings.wanIP)) {
                     sendMessage(WEAR_MESSAGE_PATH, "con:wan");
                 }
             }
-
-            TextView connectionView = (TextView) findViewById(R.id.viewConnection);
         }
 
         @Override
