@@ -48,7 +48,6 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
     static final int DIALOG_ID = 0;
     int hour_x;
     int minute_x;
-    String phoneAlarm;
     static final String NO_CONNECTION_TEXT = "No internet connection";
 
     @Override
@@ -74,8 +73,6 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
             };
 
     public static final String ACTION_TEXT_CHANGED = "changed";
-
-
 
     /******** Watch stuff **********/
 
@@ -170,8 +167,6 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
             if(content.contains("hello!")){
                 wearAppOpened();
             }
-
-
         }
     };
 
@@ -210,23 +205,6 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
 
         // Draw WIFI/Internet on UI on startup
         getServerAddress();
-
-        // Draw set wakeup time
-        //phoneAlarm = Settings.System.getString(getContentResolver(), Settings.System.NEXT_ALARM_FORMATTED).substring(3);
-        //TextView buttonSyncWakeup = (TextView)findViewById(R.id.buttonSyncWakeup);
-
-        //buttonSyncWakeup.setText("Sync to " + phoneAlarm);
-
-        //phoneAlarm = AlarmManager.getNextAlarmClock();
-
-       /* AlarmManager alarm = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
-        Long wakeuptime = alarm.getNextAlarmClock().getTriggerTime();
-
-        if(wakeuptime != null)
-        {
-            Toast.makeText(getBaseContext(), wakeuptime.toString(), Toast.LENGTH_LONG).show();
-        }*/
-
 
         // Initialize the list view
         final ListView presetList = (ListView) findViewById(R.id.listPresets);
