@@ -37,6 +37,7 @@ import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.regex.Pattern;
 
 public class MainActivity extends Activity implements GoogleApiClient.ConnectionCallbacks {
 
@@ -245,6 +246,15 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
             }
         });
 
+        // wakeup button listener
+        buttonSetWakeup.setOnLongClickListener(new View.OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View v) {
+                clearAlarm();
+                return true;
+            }
+        });
+
         // home switch listener
         final Switch switchAtHome = (Switch) findViewById(R.id.switchAtHome);
         switchAtHome.setOnClickListener(new View.OnClickListener() {
@@ -347,6 +357,23 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
         updateUIStatus();
     }
 
+    public void clearAlarm (){
+
+        String link = getServerAddress() + "api.php?setAlarm&clear&key=" + settings.apikey;
+
+        try {
+            // Contact server
+            new MyTask().execute(new URL(link));
+            // Show OK message
+            Toast.makeText(MainActivity.this, "Wakeup removed." , Toast.LENGTH_LONG).show();
+        } catch (MalformedURLException e) {
+            e.printStackTrace();
+        }
+
+        alarmSet = "";
+        updateUIStatus();
+    }
+
     protected String getServerAddress () {
 
         WifiManager wifi = (WifiManager) getSystemService(Context.WIFI_SERVICE);
@@ -390,8 +417,14 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
 
         // Users name
         TextView TextViewUserName = (TextView) findViewById(R.id.TextViewUserName);
-        TextViewUserName.setText("Hey "+userFirstName+"!");
+        TextViewUserName.setText("Hey " + userFirstName + "!");
 
+        String nextAlarm = android.provider.Settings.System.getString(getContentResolver(), android.provider.Settings.System.NEXT_ALARM_FORMATTED);
+        nextAlarm = nextAlarm.substring(3);
+        String[] time = nextAlarm.split(Pattern.quote("."));
+
+        minute_x = Integer.parseInt(time[1]);
+        hour_x = Integer.parseInt(time[0]);
     }
 
     class MyTask extends AsyncTask <URL, Void, String>{
@@ -492,8 +525,6 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
                     hour_x = 9;
                     minute_x = 0;
                 }
-
-
 
                 updateUIStatus();
             } else {
